@@ -20,12 +20,13 @@ from keras.utils.np_utils import to_categorical
 # from keras.applications.inception_v3 import InceptionV3
 from keras.applications.vgg16 import VGG16
 from keras.optimizers import Adam
-import tensorflow_hub as hub
+import tensorflow as tf
 from keras.models import Model
-
-
-train = 'E:/MSc/Research/Data/test case 1/train/'
-test = 'E:/MSc/Research/Data/test case 1/test/'
+import datetime
+from matplotlib import pyplot
+from numpy import expand_dims
+from keras.applications.vgg16 import preprocess_input
+from keras.preprocessing.image import img_to_array, load_img
 
 
 def read_data(train, test):
@@ -65,6 +66,15 @@ def read_data(train, test):
 def train_model(training_set, test_set, epc = 10, stp = 100):
     # Initialize the model
     classifier = Sequential()
+
+    # Load the VGG model
+    # load model without output layer
+    vgg_model = VGG16(
+        weights='E:/Projects/Dialog/Models/pre_trained_models/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
+        include_top=False, input_shape=(224, 224, 3))
+
+    classifier.add(vgg_model)
+
     classifier.add(Conv2D(32, (3, 3), input_shape=(224, 224, 3)))
     classifier.add(Conv2D(32, (3, 3), activation='relu'))
     classifier.add(MaxPool2D(pool_size=(2, 2), strides=(2, 2)))
@@ -92,12 +102,14 @@ def train_model(training_set, test_set, epc = 10, stp = 100):
                                    save_best_only=True)
 
     annealer = ReduceLROnPlateau(monitor='val_accuracy', factor=0.5, patience=5, verbose=1, min_lr=1e-5)
+    # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    # tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
 
     # Train the model
     history = classifier.fit_generator(training_set,
                                        steps_per_epoch = int(stp),
                                        epochs = int(epc),
-                                       callbacks=[annealer, checkpointer],
+                                       callbacks=[annealer, checkpointer],#tensorboard_callback],
                                        validation_data = test_set,
                                        validation_steps = 50)
     return history, classifier
@@ -197,6 +209,39 @@ def visualize_activalions(img_path, classifier):
         plt.show()
 
 
+def visualize_feature_map(img_path, model):
+    # redefine model to output right after the first hidden layer
+    ixs = [2,5,7,9]
+    outputs = [model.layers[i].output for i in ixs]
+    model = Model(inputs=model.inputs, outputs=outputs)
+    # load the image with the required shape
+    img = load_img(img_path, target_size=(224, 224))
+    # convert the image to an array
+    img = img_to_array(img)
+    # expand dimensions so that it represents a single 'sample'
+    img = expand_dims(img, axis=0)
+    # prepare the image (e.g. scale pixel values for the vgg)
+    img = preprocess_input(img)
+    # get feature map for first hidden layer
+    feature_maps = model.predict(img)
+    # plot the output from each block
+    square = 5
+    for fmap in feature_maps:
+        # plot all 64 maps in an 8x8 squares
+        ix = 1
+        for _ in range(square):
+            for _ in range(square):
+                # specify subplot and turn of axis
+                ax = pyplot.subplot(square, square, ix)
+                ax.set_xticks([])
+                ax.set_yticks([])
+                # plot filter channel in grayscale
+                pyplot.imshow(fmap[0, :, :, ix - 1])
+                ix += 1
+        # show the figure
+        pyplot.show()
+
+
 def train_validation(history):
 
     #Graphing our training and validation
@@ -239,13 +284,27 @@ def get_confusion_matrix(classifier, test_set, test_labels):
 
 # Main - Build model
 
-training_set, test_set, train_labels, test_labels = read_data(train, test)
-history, classifier = train_model(training_set, test_set, epc = 1, stp = 1)
-accuracy_curves(history)
-# visualize_activalions(img_path, classifier)
-train_validation(history)
-save_model(classifier, 'E:/MSc/Research/Models/test case 1.h5')
 
-# classifier = read_model('E:/MSc/Research/Models/test case 1.h5')
-get_confusion_matrix(classifier, test_set, test_labels)
-get_confusion_matrix(classifier, training_set, train_labels)
+train = 'E:/MSc/Research/Data/test case 2/train/'
+test = 'E:/MSc/Research/Data/test case 2/test/'
+
+
+# training_set, test_set, train_labels, test_labels = read_data(train, test)
+# history, classifier = train_model(training_set, test_set, epc = 1, stp = 1)
+# accuracy_curves(history)
+# train_validation(history)
+# save_model(classifier, 'E:/MSc/Research/Models/test case 54312.h5')
+
+# classifier = read_model('E:/MSc/Research/Models/old models/test_case_2.h5')
+# get_confusion_matrix(classifier, test_set, test_labels)
+# get_confusion_matrix(classifier, training_set, train_labels)
+
+# classifier = VGG16(
+#     weights='E:/Projects/Dialog/Models/pre_trained_models/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
+#     include_top=False, input_shape=(224, 224, 3))
+#
+classifier = VGG16(
+        weights='E:/Projects/Dialog/Models/pre_trained_models/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
+        include_top=False, input_shape=(224, 224, 3))
+img_path = "E:/MSc/Research/Data/test case 1/test/invalid/dtv_88888888_1571310474440_1_1571310629067.jpg"
+visualize_feature_map(img_path, classifier)
