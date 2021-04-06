@@ -70,7 +70,7 @@ def train_model(training_set, test_set, epc = 10, stp = 100):
     # Load the VGG model
     # load model without output layer
     vgg_model = VGG16(
-        weights='E:/Projects/Dialog/Models/pre_trained_models/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
+        weights='E:/MSc/Research/Models/VGG/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
         include_top=False, input_shape=(224, 224, 3))
 
     classifier.add(vgg_model)
@@ -102,14 +102,14 @@ def train_model(training_set, test_set, epc = 10, stp = 100):
                                    save_best_only=True)
 
     annealer = ReduceLROnPlateau(monitor='val_accuracy', factor=0.5, patience=5, verbose=1, min_lr=1e-5)
-    # log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    # tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+    log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
 
     # Train the model
     history = classifier.fit_generator(training_set,
                                        steps_per_epoch = int(stp),
                                        epochs = int(epc),
-                                       callbacks=[annealer, checkpointer],#tensorboard_callback],
+                                       callbacks=[annealer, checkpointer, tensorboard_callback],
                                        validation_data = test_set,
                                        validation_steps = 50)
     return history, classifier
@@ -303,8 +303,8 @@ test = 'E:/MSc/Research/Data/test case 2/test/'
 #     weights='E:/Projects/Dialog/Models/pre_trained_models/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
 #     include_top=False, input_shape=(224, 224, 3))
 #
-classifier = VGG16(
-        weights='E:/Projects/Dialog/Models/pre_trained_models/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
-        include_top=False, input_shape=(224, 224, 3))
-img_path = "E:/MSc/Research/Data/test case 1/test/invalid/dtv_88888888_1571310474440_1_1571310629067.jpg"
-visualize_feature_map(img_path, classifier)
+# classifier = VGG16(
+#         weights='E:/MSc/Research/Models/VGG/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
+#         include_top=False, input_shape=(224, 224, 3))
+# img_path = "E:/MSc/Research/Data/test case 1/test/invalid/dtv_88888888_1571310474440_1_1571310629067.jpg"
+# visualize_feature_map(img_path, classifier)
