@@ -1,43 +1,37 @@
 
-from matplotlib import pyplot as plt
-# import matplotlib.image as mpimg
-import numpy as np
-# import imageio as im
-from keras import models, regularizers, losses, optimizers
-from keras.models import Sequential
-from keras.layers import Conv2D
-from keras.layers import MaxPooling2D, MaxPool2D
-from keras.layers import Flatten
-from keras.layers import Dense, GlobalAveragePooling2D
-from keras.layers import Dropout, InputLayer
-from keras.preprocessing import image
-from keras.preprocessing.image import ImageDataGenerator
-from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
-from keras.models import load_model
-from sklearn.metrics import classification_report, confusion_matrix
-import pandas as pd
-from keras.utils.np_utils import to_categorical
-# from keras.applications.inception_v3 import InceptionV3
-from keras.applications.vgg16 import VGG16
-from keras.optimizers import Adam
 import tensorflow as tf
-from keras.models import Model
-import datetime
+from matplotlib import pyplot as plt
+import numpy as np
+from keras import models
+# from keras.models import Sequential
+# from keras.layers import Conv2D
+# from keras.layers import MaxPool2D
+# from keras.layers import Flatten
+# from keras.layers import Dense
+# from keras.preprocessing import image
+# from keras.preprocessing.image import ImageDataGenerator
+# from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, TensorBoard
+# from keras.models import load_model
+from sklearn.metrics import classification_report, confusion_matrix
+# from keras.utils.np_utils import to_categorical
+# from keras.optimizers import Adam
+# from keras.models import Model
 from matplotlib import pyplot
 from numpy import expand_dims
-from keras.applications.vgg16 import preprocess_input
-from keras.preprocessing.image import img_to_array, load_img
+# from keras.applications.vgg16 import preprocess_input
+# from keras.preprocessing.image import img_to_array, load_img
+from time import time
 
 
 def read_data(train, test):
 
-    train_datagen = ImageDataGenerator(rescale=1. / 255)
-    test_datagen = ImageDataGenerator(rescale=1. / 255)
+    train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale=1. / 255)
+    test_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale=1. / 255)
 
     # Train data
     training_set = train_datagen.flow_from_directory(str(train),
                                                      target_size = (224, 224),
-                                                     batch_size = 16,
+                                                     batch_size = 10,
                                                      shuffle=False,
                                                      class_mode = 'categorical')
 
@@ -45,12 +39,12 @@ def read_data(train, test):
     train_labels = training_set.classes
 
     # convert the training labels to categorical vectors
-    train_labels = to_categorical(train_labels, num_classes=2)
+    train_labels = tf.keras.utils.to_categorical(train_labels, num_classes=2)
 
     # Test data
     test_set = test_datagen.flow_from_directory(str(test),
                                                 target_size = (224, 224),
-                                                batch_size = 16,
+                                                batch_size = 10,
                                                 shuffle=False,
                                                 class_mode = 'categorical')
 
@@ -58,60 +52,60 @@ def read_data(train, test):
     test_labels = test_set.classes
 
     # convert the training labels to categorical vectors
-    test_labels = to_categorical(test_labels, num_classes=2)
+    test_labels = tf.keras.utils.to_categorical(test_labels, num_classes=2)
 
     return training_set, test_set, train_labels, test_labels
 
 
 def train_model(training_set, test_set, epc = 10, stp = 100):
     # Initialize the model
-    classifier = Sequential()
+    classifier = tf.keras.models.Sequential()
 
     # Load the VGG model
     # load model without output layer
-    vgg_model = VGG16(
+    vgg_model = tf.keras.applications.VGG16(
         weights='E:/MSc/Research/Models/VGG/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
         include_top=False, input_shape=(224, 224, 3))
-
+    #
     classifier.add(vgg_model)
 
-    classifier.add(Conv2D(32, (3, 3), input_shape=(224, 224, 3)))
-    classifier.add(Conv2D(32, (3, 3), activation='relu'))
-    classifier.add(MaxPool2D(pool_size=(2, 2), strides=(2, 2)))
-    classifier.add(Flatten())  # Flatten the input
+    classifier.add(tf.keras.layers.Conv2D(32, (3, 3), input_shape=(224, 224, 3)))
+    classifier.add(tf.keras.layers.Conv2D(32, (3, 3), activation='relu'))
+    classifier.add(tf.keras.layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2)))
+    classifier.add(tf.keras.layers.Flatten())  # Flatten the input
 
-    classifier.add(Dense(512, activation='relu'))
-    classifier.add(Dense(512, activation='relu'))
-    classifier.add(Dense(512, activation='relu'))
-    classifier.add(Dense(2, activation='softmax'))
+    classifier.add(tf.keras.layers.Dense(512, activation='relu'))
+    classifier.add(tf.keras.layers.Dense(512, activation='relu'))
+    classifier.add(tf.keras.layers.Dense(512, activation='relu'))
+    classifier.add(tf.keras.layers.Dense(2, activation='softmax'))
 
 
     # Model summary
     print(classifier.summary())
 
-    optimizer = Adam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0)
+    optimizer = tf.keras.optimizers.Adam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0)
+
+    tensorboard = tf.keras.callbacks.TensorBoard(log_dir="logs\{}".format(time()))
 
     classifier.compile(optimizer= optimizer, #'rmsprop',
                        loss='categorical_crossentropy',
                        metrics=['accuracy'])
 
     # To store the weights of the best performing epoch
-    checkpointer = ModelCheckpoint(filepath="best_weights.hdf5",
+    checkpointer = tf.keras.callbacks.ModelCheckpoint(filepath="best_weights.hdf5",
                                    monitor = 'val_accuracy',
                                    verbose=1,
                                    save_best_only=True)
 
-    annealer = ReduceLROnPlateau(monitor='val_accuracy', factor=0.5, patience=5, verbose=1, min_lr=1e-5)
-    log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+    annealer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_accuracy', factor=0.5, patience=5, verbose=1, min_lr=1e-5)
 
     # Train the model
     history = classifier.fit_generator(training_set,
                                        steps_per_epoch = int(stp),
                                        epochs = int(epc),
-                                       callbacks=[annealer, checkpointer, tensorboard_callback],
+                                       callbacks=[annealer, checkpointer, tensorboard],
                                        validation_data = test_set,
-                                       validation_steps = 50)
+                                       validation_steps = 10)
     return history, classifier
 
 
@@ -124,7 +118,7 @@ def save_model(classifier, name):
 def read_model(name):
 
     # Load the model
-    model = load_model(str(name))
+    model = tf.keras.models.load_model(str(name))
     return model
 
 
@@ -152,14 +146,14 @@ def accuracy_curves(history):
 
 def visualize_activalions(img_path, classifier):
 
-    img = image.load_img(img_path, target_size=(224, 224))
-    img_tensor = image.img_to_array(img)
+    img = tf.keras.preprocessing.image.load_img(img_path, target_size=(224, 224))
+    img_tensor = tf.keras.preprocessing.image.img_to_array(img)
     img_tensor = np.expand_dims(img_tensor, axis=0)
     img_tensor /= 255.
 
     print(img_tensor.shape)
 
-    x = image.img_to_array(img)
+    x = tf.keras.preprocessing.image.img_to_array(img)
     x = np.expand_dims(x, axis=0)
 
     images = np.vstack([x])
@@ -169,7 +163,7 @@ def visualize_activalions(img_path, classifier):
 
     # Visualizing intermediate activations
     layer_outputs = [layer.output for layer in classifier.layers[:12]] # Extracts the outputs of the top 12 layers
-    activation_model = models.Model(inputs=classifier.input, outputs=layer_outputs)
+    activation_model = tf.keras.models.Model(inputs=classifier.input, outputs=layer_outputs)
     activations = activation_model.predict(img_tensor)
     first_layer_activation = activations[0]
     print(first_layer_activation.shape)
@@ -213,15 +207,15 @@ def visualize_feature_map(img_path, model):
     # redefine model to output right after the first hidden layer
     ixs = [2,5,7,9]
     outputs = [model.layers[i].output for i in ixs]
-    model = Model(inputs=model.inputs, outputs=outputs)
+    model = tf.keras.models.Model(inputs=model.inputs, outputs=outputs)
     # load the image with the required shape
-    img = load_img(img_path, target_size=(224, 224))
+    img = tf.keras.preprocessing.load_img(img_path, target_size=(224, 224))
     # convert the image to an array
-    img = img_to_array(img)
+    img = tf.keras.preprocessing.img_to_array(img)
     # expand dimensions so that it represents a single 'sample'
     img = expand_dims(img, axis=0)
     # prepare the image (e.g. scale pixel values for the vgg)
-    img = preprocess_input(img)
+    img = tf.keras.preprocessing.preprocess_input(img)
     # get feature map for first hidden layer
     feature_maps = model.predict(img)
     # plot the output from each block
@@ -289,22 +283,12 @@ train = 'E:/MSc/Research/Data/test case 2/train/'
 test = 'E:/MSc/Research/Data/test case 2/test/'
 
 
-# training_set, test_set, train_labels, test_labels = read_data(train, test)
-# history, classifier = train_model(training_set, test_set, epc = 1, stp = 1)
+training_set, test_set, train_labels, test_labels = read_data(train, test)
+history, classifier = train_model(training_set, test_set, epc = 20, stp = 20)
 # accuracy_curves(history)
 # train_validation(history)
-# save_model(classifier, 'E:/MSc/Research/Models/test case 54312.h5')
+save_model(classifier, 'E:/MSc/Research/Models/test case 2 tensorboard_20_epc_50_stp.h5')
 
-# classifier = read_model('E:/MSc/Research/Models/old models/test_case_2.h5')
-# get_confusion_matrix(classifier, test_set, test_labels)
-# get_confusion_matrix(classifier, training_set, train_labels)
 
-# classifier = VGG16(
-#     weights='E:/Projects/Dialog/Models/pre_trained_models/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
-#     include_top=False, input_shape=(224, 224, 3))
-#
-# classifier = VGG16(
-#         weights='E:/MSc/Research/Models/VGG/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
-#         include_top=False, input_shape=(224, 224, 3))
-# img_path = "E:/MSc/Research/Data/test case 1/test/invalid/dtv_88888888_1571310474440_1_1571310629067.jpg"
-# visualize_feature_map(img_path, classifier)
+# initiate Tensorboard
+# tensorboard --logdir=logs/
