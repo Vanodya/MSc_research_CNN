@@ -47,7 +47,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLRO
 from sklearn.metrics import classification_report, confusion_matrix
 
 
-def visualize_sample_signature():
+def visualize_sample_image():
     '''Function to randomly select a satellite from train set and
     print two genuine copies and one forged copy'''
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(10, 10))
@@ -289,7 +289,7 @@ del orig_groups, forg_groups
 img_h, img_w = 155, 220
 
 
-visualize_sample_signature()
+visualize_sample_image()
 
 
 input_shape = (img_h, img_w, 1)
