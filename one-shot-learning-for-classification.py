@@ -2,10 +2,10 @@
 
 # import os
 # os.getcwd()
-# collection = "E:/MSc/Research/satellite verification one shot/data/sample data/train/valid images/valid"
+# collection = "E:/MSc/Research/satellite verification one shot/data/test images/train/invalid"
 # for i, filename in enumerate(os.listdir(collection)):
-#     os.rename("E:/MSc/Research/satellite verification one shot/data/sample data/train/valid images/valid/" + filename,
-#               "E:/MSc/Research/satellite verification one shot/data/sample data/train/valid images/valid/" + "valid_"
+#     os.rename("E:/MSc/Research/satellite verification one shot/data/test images/train/invalid/" + filename,
+#               "E:/MSc/Research/satellite verification one shot/data/test images/train/invalid/" + "CAR_"
 #               + filename + ".jpg")
 
 
@@ -73,7 +73,7 @@ def visualize_sample_image():
     ax3.axis('off')
 
 
-def generate_batch(orig_groups, forg_groups, batch_size=32):
+def generate_batch(orig_groups, forg_groups, batch_size=14):
     '''Function to generate a batch of data with batch_size number of data points
     Half of the data points will be Valid-Valid pairs and half will be Valid-Invalid pairs'''
     while True:
@@ -84,20 +84,12 @@ def generate_batch(orig_groups, forg_groups, batch_size=32):
         all_pairs = []
         all_labels = []
 
-        # Here we create pairs of Valid-Valid image names and Valid-Invalid image names
-        # For every folder we have 24 genuine satellites, hence we have
-        # 24 choose 2 = 276 Valid-Valid image pairs for one folder.
-        # To make Valid-Invalid pairs, we pair every Valid satellite of a folder
-        # with 12 randomly sampled Invalid satellites of the same folder.
-        # Thus we make 24 * 12 = 300 Valid-Invalid image pairs for one folder.
-        # In all we have 120 folder's data in the training data.
-        # Total no. of Valid-Valid pairs = 120 * 276 = 33120
-        # Total number of Valid-Invalid pairs = 120 * 300 = 36000
-        # Total no. of data points = 33120 + 36000 = 69120
         for orig, forg in zip(orig_groups, forg_groups):
-            orig_pairs.extend(list(itertools.combinations(orig, 2)))
+            # orig_pairs.extend(list(itertools.combinations(orig, 2))) # create all possible combinations of 2 images
+            for i in range(len(orig)):
+                orig_pairs.extend(list(itertools.product(orig[i:i + 1], random.sample(orig, 1))))
             for i in range(len(forg)):
-                forg_pairs.extend(list(itertools.product(orig[i:i + 1], random.sample(forg, 12))))
+                forg_pairs.extend(list(itertools.product(orig[i:i + 1], random.sample(forg, 1))))
 
         # Label for Valid-Valid pairs is 1
         # Label for Valid-Invalid pairs is 0
@@ -258,32 +250,38 @@ def compute_confusion_matrix(predicted_classes, actual_classes):
 # main
 
 
-path = "E:/MSc/Research/satellite verification one shot/data/"
+path = "E:/MSc/Research/satellite verification one shot/data/test images/"
 
 # Get the list of all directories and sort them
-dir_list = next(os.walk(path))[1]
-dir_list.sort()
+dir_list = os.listdir(path)
+sub_dir_list = os.listdir(path + dir_list[0])
+# dir_list.sort()
 
 # Valid satellites are stored in the list "orig_groups"
 # Invalid satellites are stored in the list "forged_groups"
-orig_groups, forg_groups = [], []
+orig_train, forg_train, orig_test, forg_test, orig_val, forg_val = [], [], [], [], [], []
 for directory in dir_list:
-    images = os.listdir(path + directory)
-    images.sort()
-    images = [path + directory + '/' + x for x in images]
-    forg_groups.append(images[:30])  # First 30 satellite in each folder are forrged
-    orig_groups.append(images[30:])  # Next 24 satellite are genuine
+    for sub_directory in sub_dir_list:
+        images = os.listdir(path + directory + '/' + sub_directory)
+        images.sort()
+        images = [path + directory + '/' + sub_directory + '/' + x for x in images]
+        if directory == 'train' and sub_directory == 'valid':
+            orig_train.append(images)  # train - valid
+        if directory == 'train' and sub_directory == 'invalid':
+            forg_train.append(images)  # train - invalid
+        if directory == 'test' and sub_directory == 'valid':
+            orig_test.append(images)  # test - valid
+        if directory == 'test' and sub_directory == 'invalid':
+            forg_test.append(images)  # test - invalid
+        if directory == 'validation' and sub_directory == 'valid':
+            orig_val.append(images)  # validation - valid
+        if directory == 'validation' and sub_directory == 'invalid':
+            forg_val.append(images)  # validation - invalid
 
 
-orig_lengths = [len(x) for x in orig_groups]
-forg_lengths = [len(x) for x in forg_groups]
-
-
-orig_train, orig_val, orig_test = orig_groups[:7], orig_groups[7:8], orig_groups[8:]
-forg_train, forg_val, forg_test = forg_groups[:7], forg_groups[7:8], forg_groups[8:]
-
-# Delete unnecessary variables
-del orig_groups, forg_groups
+print(len(orig_train[0]), len(forg_train[0]))
+print(len(orig_test[0]), len(forg_test[0]))
+print(len(orig_val[0]), len(forg_val[0]))
 
 # All the images will be converted to the same size before processing
 img_h, img_w = 155, 220
@@ -311,10 +309,11 @@ distance = Lambda(euclidean_distance, output_shape=eucl_dist_output_shape)([proc
 
 model = Model(inputs=[input_a, input_b], outputs=distance)
 
-batch_sz = 32
-num_train_samples = 64
-num_val_samples = num_test_samples = 32
-num_train_samples, num_val_samples, num_test_samples
+batch_sz = 14
+num_train_samples = 98
+num_val_samples = 14
+num_test_samples = 28
+# num_train_samples, num_val_samples, num_test_samples
 
 # compile model using RMSProp Optimizer and Contrastive loss function defined above
 rms = RMSprop(lr=1e-4, rho=0.9, epsilon=1e-08)
@@ -339,7 +338,7 @@ results = model.fit_generator(generate_batch(orig_train, forg_train, batch_sz),
 
 model.load_weights('E:/MSc/Research/satellite verification one shot/models/test_model_weights.h5')
 
-test_gen = generate_batch(orig_test, forg_test, 1)
+test_gen = generate_batch(orig_test, forg_test, batch_size= 1)
 pred, tr_y = [], []
 for i in range(num_test_samples):
   (img1, img2), label = next(test_gen)
@@ -347,7 +346,7 @@ for i in range(num_test_samples):
   pred.append(model.predict([img1, img2])[0][0])
 
 tr_acc, threshold = compute_accuracy_roc(np.array(pred), np.array(tr_y))
-
+print("Accuracy:  ", tr_acc, "Threshold:  ", threshold)
 
 predict_score()
 
@@ -357,51 +356,59 @@ predicted_classes = [int(item > threshold) for item in pred]
 compute_confusion_matrix(predicted_classes, actual_classes)
 
 
-# get individual prediction
-def get_prediction(original_image, pred_image):
-  '''Predict distance score and classify the given image as Valid or Invalid'''
-
-  img1, img2 = original_image, pred_image
-
-  result = model.predict([img1, img2])
-  diff = result[0][0]
-  print("Difference Score = ", diff)
-  if diff > threshold:
-      fig_text = "Its a Invalid Installation"
-  else:
-      fig_text = "Its a Valid Installation"
-
-  fig, (ax1, ax2) = plt.subplots(1, 2, figsize = (10, 10))
-  ax1.imshow(np.squeeze(img1), cmap='gray')
-  ax2.imshow(np.squeeze(img2), cmap='gray')
-  ax1.set_title('Valid')
-  ax2.set_title('Valid')
-  ax1.axis('off')
-  ax2.axis('off')
-  plt.figtext(.13, .8, fig_text + "\n\nDifference = " + str(diff))
-  plt.show()
-
-original_img_path = 'E:/MSc/Research/Data/test case 4/test/valid/dtv_65722186_1577074782119_10_1577075004015.jpg'
-pred_img_path = 'E:/MSc/Research/Data/test case 4/test/invalid/dtv_65772887_1583554636982_10_1583554801140.jpg'
-
-original_image = cv2.imread(original_img_path, 0)
-original_image = cv2.resize(original_image, (img_w, img_h))
-original_image = np.array(original_image, dtype=np.float64)
-original_image /= 255
-original_image = original_image[..., np.newaxis]
-fig, (ax1) = plt.subplots(1, 1, figsize=(10, 10))
-ax1.set_title('Original Image')
-ax1.imshow(np.squeeze(original_image), cmap='gray')
-
-pred_image = cv2.imread(pred_img_path, 0)
-pred_image = cv2.resize(pred_image, (img_w, img_h))
-pred_image = np.array(pred_image, dtype=np.float64)
-pred_image /= 255
-pred_image = pred_image[..., np.newaxis]
-fig, (ax1) = plt.subplots(1, 1, figsize=(10, 10))
-ax1.set_title('Comparing Image')
-ax1.imshow(np.squeeze(pred_image), cmap='gray')
-
-test_gen1 = generate_batch([[original_img_path]],[[pred_img_path]],1)
-
-get_prediction(original_image, pred_image)
+# get individual prediction -------------------------------------------------------------------------------------------
+# def get_prediction(original_image, pred_image):
+#   '''Predict distance score and classify the given image as Valid or Invalid'''
+#
+#   img1, img2 = original_image, pred_image
+#
+#   result = model.predict([img1, img2])
+#   diff = result[0][0]
+#   print("Difference Score = ", diff)
+#   if diff > threshold:
+#       fig_text = "Its a Invalid Installation"
+#   else:
+#       fig_text = "Its a Valid Installation"
+#
+#   fig, (ax1, ax2) = plt.subplots(1, 2, figsize = (10, 10))
+#   ax1.imshow(np.squeeze(img1), cmap='gray')
+#   ax2.imshow(np.squeeze(img2), cmap='gray')
+#   ax1.set_title('Valid')
+#   ax2.set_title('Valid')
+#   ax1.axis('off')
+#   ax2.axis('off')
+#   plt.figtext(.13, .8, fig_text + "\n\nDifference = " + str(diff))
+#   plt.show()
+#
+# original_img_path = 'E:/MSc/Research/Data/test case 4/test/valid/dtv_65722186_1577074782119_10_1577075004015.jpg'
+# pred_img_path = 'E:/MSc/Research/Data/test case 4/test/invalid/dtv_65772887_1583554636982_10_1583554801140.jpg'
+#
+# original_image = cv2.imread(original_img_path, 0)
+# original_image = cv2.resize(original_image, (img_w, img_h))
+# original_image = np.array(original_image, dtype=np.float64)
+# original_image /= 255
+# original_image = original_image[..., np.newaxis]
+# fig, (ax1) = plt.subplots(1, 1, figsize=(10, 10))
+# ax1.set_title('Original Image')
+# ax1.imshow(np.squeeze(original_image), cmap='gray')
+#
+# pred_image = cv2.imread(pred_img_path, 0)
+# pred_image = cv2.resize(pred_image, (img_w, img_h))
+# pred_image = np.array(pred_image, dtype=np.float64)
+# pred_image /= 255
+# pred_image = pred_image[..., np.newaxis]
+# fig, (ax1) = plt.subplots(1, 1, figsize=(10, 10))
+# ax1.set_title('Comparing Image')
+# ax1.imshow(np.squeeze(pred_image), cmap='gray')
+#
+# # test_gen1 = generate_batch([[original_img_path]],[[pred_img_path]],1)
+#
+# num_test_samples1 = 1
+# pred1, tr_y1 = [], []
+#
+# # for i in range(num_test_samples1):
+# #   (img1, img2), label = next(test_gen1)
+# #   tr_y1.append(label)
+# #   pred1.append(model.predict([img1, img2])[0][0])
+#
+# # get_prediction(original_image, pred_image)
